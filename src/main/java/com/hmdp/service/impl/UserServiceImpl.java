@@ -43,6 +43,8 @@ import static com.hmdp.utils.RedisConstants.*;
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IUserService {
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
+    @Autowired
+    private MailUtils mailUtils;
     //发短信
     @Override
     public Result sendCode(String phone, HttpSession session) throws jakarta.mail.MessagingException {
@@ -84,14 +86,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         }
 
           //生成验证码
-        String code = MailUtils.achieveCode();
+        String code = mailUtils.generateVerificationCode();
 
          //将生成的验证码保持到redis
         stringRedisTemplate.opsForValue().set(LOGIN_CODE_KEY+phone,code,LOGIN_CODE_TTL, TimeUnit.MINUTES);
 
         log.info("发送登录验证码：{}", code);
          //发送验证码
-        MailUtils.sendtoMail(phone, code);
+        mailUtils.sendVerificationCode(phone, code);
 
         // 更新发送时间和次数
         stringRedisTemplate.opsForZSet().add(SENDCODE_SENDTIME_KEY + phone, System.currentTimeMillis() + "", System.currentTimeMillis());

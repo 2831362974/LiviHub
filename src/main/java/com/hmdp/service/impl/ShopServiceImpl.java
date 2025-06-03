@@ -264,21 +264,25 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 
         ArrayList<Long> ids = new ArrayList<>(list.size());
         HashMap<String, Distance> distanceMap = new HashMap<>(list.size());
-        list.stream().skip(from).forEach(result -> {
+
+        // 使用更安全的方式截取列表
+        List<GeoResult<RedisGeoCommands.GeoLocation<String>>> subList = list.subList(from, Math.min(end, list.size()));
+        for (GeoResult<RedisGeoCommands.GeoLocation<String>> result : subList) {
             String shopIdStr = result.getContent().getName();
             ids.add(Long.valueOf(shopIdStr));
-            Distance distance = result.getDistance();
-            distanceMap.put(shopIdStr, distance);
-        });
+            distanceMap.put(shopIdStr, result.getDistance());
+        }
 
+        //5. 根据id查询shop (关键修改点：检查ids是否为空)
+        List<Shop> shops = Collections.emptyList();
+        if (!ids.isEmpty()) {
+            // 构建SQL时确保ids不为空
+            shops = query().in("id", ids).last("ORDER BY FIELD(id, " + StrUtil.join(",", ids) + ")").list();
 
-        //5. 根据id查询shop
-        String idsStr = StrUtil.join(",", ids);
-
-        List<Shop> shops = query().in("id", ids).last("ORDER BY FIELD( id," + idsStr + ")").list();
-        for (Shop shop : shops) {
-            //设置shop的举例属性，从distanceMap中根据shopId查询
-            shop.setDistance(distanceMap.get(shop.getId().toString()).getValue());
+            // 设置距离信息
+            for (Shop shop : shops) {
+                shop.setDistance(distanceMap.get(shop.getId().toString()).getValue());
+            }
         }
         //6. 返回
         return Result.ok(shops);
