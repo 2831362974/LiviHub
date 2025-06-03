@@ -2,7 +2,7 @@ server:
   port: 8081
 spring:
   application:
-    name: dianping
+    name: liviHub
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://127.0.0.1:3306/dianping
@@ -45,7 +45,7 @@ spring:
     host: smtp.qq.com
     port: 587
     username: 2831362974@qq.com
-    password: mlzofnlfpveqdfab #防止泄露
+    password: #防止泄露 使用环境变量配置
     properties:
       mail:
         smtp:
@@ -53,6 +53,10 @@ spring:
           starttls:
             enable: true
             required: true
+  elasticsearch:
+    uris: http://localhost:9200 # Elasticsearch 服务地址
+    username: elastic # 如果有用户名
+    password: MQXwsSgaz1-YuFtg7MhM # 如果有密码
 mybatis-plus:
   type-aliases-package: com.hmdp.entity # 别名扫描包
 logging:
