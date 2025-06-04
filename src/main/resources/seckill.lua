@@ -31,9 +31,9 @@ if(redis.call('sismember',orderKey,userId) == 1) then
     -- 3.3存在,说明是重复下单
     return 2
 end
--- 3.4扣库存
+-- 3.4 redis库存预扣减
 redis.call('incrby',stockKey,-1)
--- 3.5下单并保存用户
+-- 3.5 下单并保存用户
 redis.call('sadd',orderKey,userId)
 
 return 0

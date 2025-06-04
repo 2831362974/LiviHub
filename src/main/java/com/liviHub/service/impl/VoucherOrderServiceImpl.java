@@ -54,8 +54,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     }
 
     /**
-     * 优惠券秒杀 要求一人一单
-     *
+     * 优惠券秒杀 要求一人一单 使用rabbitmq异步解耦
+     * 秒杀消息生产者 中只通过预热的redis数据进行库存/资格验证，通过发送消息给消费者
      * @param voucherId
      * @return
      */
