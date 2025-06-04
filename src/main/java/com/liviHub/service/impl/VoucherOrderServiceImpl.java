@@ -10,6 +10,8 @@ import com.liviHub.service.IVoucherOrderService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.liviHub.utils.RedisIdWorker;
 import com.liviHub.utils.UserHolder;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -35,8 +37,10 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     @Resource
     private MQSender mqSender;
 
-    private RateLimiter rateLimiter=RateLimiter.create(10);
+    private RateLimiter rateLimiter = RateLimiter.create(10);
 
+    @Resource
+    private RedissonClient redissonClient;
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
@@ -51,56 +55,47 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
     /**
      * 优惠券秒杀 要求一人一单
+     *
      * @param voucherId
      * @return
      */
     @Override
     public Result seckillVoucher(Long voucherId) {
         //令牌桶算法 限流
-        if (!rateLimiter.tryAcquire(1000, TimeUnit.MILLISECONDS)){
+        if (!rateLimiter.tryAcquire(1000, TimeUnit.MILLISECONDS)) {
             return Result.fail("目前网络正忙，请重试");
         }
-        //1.执行lua脚本
+        //1.1 获取用户ID，执行lua脚本判断秒杀资格
         Long userId = UserHolder.getUser().getId();
-
         Long r = stringRedisTemplate.execute(
                 SECKILL_SCRIPT,
                 Collections.emptyList(),//KEYS
                 voucherId.toString(),//ARGV[1]
                 userId.toString()//ARGV[2]
         );
-        //2.判断结果为0
+        //2.1 判断结果是否为0
         int result = r.intValue();
         if (result != 0) {
-            //2.1不为0代表没有购买资格
+            //不为0代表没有购买资格
             return Result.fail(r == 1 ? "库存不足" : "该用户重复下单");
         }
-        //2.2为0代表有购买资格,将下单信息保存到阻塞队列
+        //2.2 为0代表有购买资格,将下单信息保存到阻塞队列
 
-        //2.3创建订单
+        //2.3 创建订单对象
         VoucherOrder voucherOrder = new VoucherOrder();
-        //2.4订单id 使用封装好的生成器生成
+        // 订单id 使用封装好的生成器生成
         long orderId = redisIdWorker.nextId("order");
         voucherOrder.setId(orderId);
-        //2.5用户id
         voucherOrder.setUserId(userId);
-        //2.6代金卷id
         voucherOrder.setVoucherId(voucherId);
 
-        //2.7将订单信息放入MQ中
+        //2.4 将订单信息放入MQ中异步处理秒杀订单
         mqSender.sendSeckillMessage(JSON.toJSONString(voucherOrder));
 
-        //2.8 返回订单id
+        //2.5 返回订单id
         return Result.ok(orderId);
-//        单机模式下，使用synchronized实现锁
-//        synchronized (userId.toString().intern())
-//        {
-//            //    createVoucherOrder的事物不会生效,因为你调用的方法，其实是this.的方式调用的，事务想要生效，
-//            //    还得利用代理来生效，所以这个地方，我们需要获得原始的事务对象， 来操作事务
-//            return voucherOrderService.createVoucherOrder(voucherId);
-//        }
     }
-
+}
 
 //    @Transactional
 //    public Result createVoucherOrder(Long voucherId) {
@@ -140,4 +135,4 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 //        //8. 返回订单id
 //        return Result.ok(orderId);
 //    }
-}
+

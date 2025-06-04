@@ -145,13 +145,13 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     //解决缓存击穿：方法--逻辑过期
     public Shop queryWithLogicalExpire(Long id) {
         //1. 从redis中查询商铺缓存
-        String json = stringRedisTemplate.opsForValue().get(CACHE_SHOP_KEY + id);
+        String shopCache = stringRedisTemplate.opsForValue().get(CACHE_SHOP_KEY + id);
         //2. 如果未命中，则返回空
-        if (StrUtil.isBlank(json)) {
+        if (StrUtil.isBlank(shopCache)) {
             return null;
         }
         //3. 命中，将json反序列化为对象
-        RedisData redisData = JSONUtil.toBean(json, RedisData.class);
+        RedisData redisData = JSONUtil.toBean(shopCache, RedisData.class);
         //3.1 将data转为Shop对象
         JSONObject shopJson = (JSONObject) redisData.getData();
         Shop shop = JSONUtil.toBean(shopJson, Shop.class);
@@ -166,7 +166,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         boolean flag = tryLock(LOCK_SHOP_KEY + id);
         //7. 获取到了锁
         if (flag) {
-            //8. 开启独立线程
+            //8. 开启独立线程（通过线程池创建）
             CACHE_REBUILD_EXECUTOR.submit(() -> {
                 try {
                     this.saveShop2Redis(id, 20L);//此处的expirSeconds应该为物品的活动时间,设置为20只为测试
@@ -184,7 +184,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     }
 
     @Override
-    @Transactional
+    @Transactional//更新操作需要开启事务，防止数据不一致问题，这里采用旁路缓存更新（cache-side）
     public Result update(Shop shop) {
         //首先先判一下空
         if (shop.getId() == null){
@@ -196,10 +196,8 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         stringRedisTemplate.delete(CACHE_SHOP_KEY + shop.getId());
         return Result.ok();
     }
-
-    //下面用来解决热点高并发访问中的缓存击穿问题
-
-    //获取锁的代码逻辑
+    //-------------------------------------------------------------
+    //获取锁的代码逻辑：setnx，不存在才能插入，否则返回false
     private boolean tryLock(String key) {
         Boolean flag = stringRedisTemplate.opsForValue().setIfAbsent(key, "1", 10, TimeUnit.SECONDS);
         //避免返回值为null，我们这里使用了BooleanUtil工具类
@@ -212,7 +210,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     }
 
     //-------------------------------------------------------------
-    //逻辑过期实现缓存击穿问题->热点问题的数据预热
+    //逻辑过期实现缓存击穿问题->热点数据预热
     public void saveShop2Redis(Long id, Long expirSeconds) throws InterruptedException {
         Shop shop = getById(id);
         Thread.sleep(200); //模拟上面取数据的时间
@@ -222,6 +220,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         redisData.setExpireTime(LocalDateTime.now().plusSeconds(expirSeconds));
         stringRedisTemplate.opsForValue().set(CACHE_SHOP_KEY + id, JSONUtil.toJsonStr(redisData));
     }
+    //-------------------------------------------------------------
 
     @Override
     public Result queryShopByType(Integer typeId, Integer current, Double x, Double y) {

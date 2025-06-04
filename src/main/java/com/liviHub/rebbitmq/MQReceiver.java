@@ -7,10 +7,13 @@ import com.liviHub.service.ISeckillVoucherService;
 import com.liviHub.service.IVoucherOrderService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.annotation.Resource;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * 消息消费者
@@ -24,6 +27,9 @@ public class MQReceiver {
 
     @Resource
     ISeckillVoucherService seckillVoucherService;
+
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
     /**
      * 接收秒杀信息并下单
      * @param msg
@@ -32,19 +38,26 @@ public class MQReceiver {
     @RabbitListener(queues = RabbitMQTopicConfig.QUEUE)
     public void receiveSeckillMessage(String msg){
         log.info("接收到消息: "+msg);
-        VoucherOrder voucherOrder = JSON.parseObject(msg, VoucherOrder.class);
 
+        VoucherOrder voucherOrder = JSON.parseObject(msg, VoucherOrder.class);
         Long voucherId = voucherOrder.getVoucherId();
-        //5.一人一单
         Long userId = voucherOrder.getUserId();
-        //5.1查询订单
-        long count = voucherOrderService.query().eq("user_id",userId).eq("voucher_id", voucherId).count();
-        //5.2判断是否存在
-        if(count>0){
-            //用户已经购买过了
-            log.error("该用户已购买过");
-            return ;
+        Long orderId = voucherOrder.getId();
+        //5.一人一单逻辑
+        //5.1 幂等性检查：orderID作为唯一id，借助redis判断订单是否已经处理
+        String orderKey = "order:processed:" + orderId;
+        Boolean processed = stringRedisTemplate.opsForValue().setIfAbsent(orderKey, "true", 1, TimeUnit.DAYS);
+        if (processed == null || !processed) {
+            log.warn("重复处理的订单: {}", orderId);
+            return;
         }
+//        long count = voucherOrderService.query().eq("user_id",userId).eq("voucher_id", voucherId).count();
+//        //5.2 判断是否已经有订单存在
+//        if(count>0){
+//            //用户已经购买过了
+//            log.error("该用户已购买过");
+//            return ;
+//        }
         log.info("扣减库存");
         //6.扣减库存
         boolean success = seckillVoucherService
