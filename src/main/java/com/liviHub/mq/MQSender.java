@@ -1,4 +1,4 @@
-package com.liviHub.rebbitmq;
+package com.liviHub.mq;
 
 import com.liviHub.config.RabbitMQTopicConfig;
 import lombok.extern.slf4j.Slf4j;
