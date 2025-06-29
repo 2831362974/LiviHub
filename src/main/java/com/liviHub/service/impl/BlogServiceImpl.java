@@ -3,8 +3,6 @@ package com.liviHub.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.liviHub.repository.BlogEsRepository;
-import com.liviHub.model.ES.EsBlog;
 import com.liviHub.model.dto.Result;
 import com.liviHub.model.dto.ScrollResult;
 import com.liviHub.model.dto.UserDTO;
@@ -55,9 +53,6 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
 
     @Autowired
     private IFollowService followService;
-
-    @Autowired
-    private BlogEsRepository blogEsRepository;
 
     @Override
     public Result queryById(Integer id) {
@@ -231,10 +226,5 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         scrollResult.setOffset(os);
         scrollResult.setMinTime(minTime);
         return Result.ok(scrollResult);
-    }
-
-    @Override
-    public List<EsBlog> searchBlog(String keyword, int page, int size){
-        return blogEsRepository.findByTitleContainingOrContentContaining(keyword,keyword);
     }
 }

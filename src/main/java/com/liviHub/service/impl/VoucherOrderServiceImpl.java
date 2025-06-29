@@ -10,7 +10,6 @@ import com.liviHub.service.IVoucherOrderService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.liviHub.utils.RedisIdWorker;
 import com.liviHub.utils.UserHolder;
-import org.redisson.api.RedissonClient;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -38,8 +37,6 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
     private RateLimiter rateLimiter = RateLimiter.create(10);
 
-    @Resource
-    private RedissonClient redissonClient;
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 

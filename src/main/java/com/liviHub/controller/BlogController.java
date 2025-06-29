@@ -2,7 +2,6 @@ package com.liviHub.controller;
 
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.liviHub.model.ES.EsBlog;
 import com.liviHub.model.dto.Result;
 import com.liviHub.model.dto.UserDTO;
 import com.liviHub.model.entity.Blog;
@@ -30,12 +29,6 @@ public class BlogController {
 
     @Autowired
     private IBlogService blogService;
-
-    @Autowired
-    private StringRedisTemplate stringRedisTemplate;
-
-    @Autowired
-    private IFollowService followService;
 
     @PostMapping
     public Result saveBlog(@RequestBody Blog blog) {
@@ -92,13 +85,4 @@ public class BlogController {
         return blogService.queryById(id);
     }
 
-    @GetMapping("/search")
-    public Result searchBlogs(@RequestParam String keyword,
-                              @RequestParam(defaultValue = "1") Integer page,
-                              @RequestParam(defaultValue = "10") Integer size) {
-        try{List<EsBlog> blogs=blogService.searchBlog(keyword,page,size);
-        return Result.ok(blogs);}catch (Exception e){
-            return Result.fail(e.getMessage());
-        }
-    }
 }

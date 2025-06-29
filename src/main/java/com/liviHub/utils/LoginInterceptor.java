@@ -4,7 +4,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-
+//第二个拦截器，拦截所有需要登录的请求
 public class LoginInterceptor implements HandlerInterceptor {
 
     @Override

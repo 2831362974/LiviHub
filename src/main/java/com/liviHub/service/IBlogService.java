@@ -1,11 +1,8 @@
 package com.liviHub.service;
 
-import com.liviHub.model.ES.EsBlog;
 import com.liviHub.model.dto.Result;
 import com.liviHub.model.entity.Blog;
 import com.baomidou.mybatisplus.extension.service.IService;
-
-import java.util.List;
 
 /**
  * <p>
@@ -28,6 +25,4 @@ public interface IBlogService extends IService<Blog> {
     Result saveBlog(Blog blog);
 
     Result queryBlogOfFollow(Long max, Integer offset);
-
-    List<EsBlog> searchBlog(String keyword,int page,int size);
 }

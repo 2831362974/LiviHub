@@ -13,7 +13,7 @@ public class MvcConfig implements WebMvcConfigurer {
     private StringRedisTemplate stringRedisTemplate;
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(new RefreshTokenInterceptor(stringRedisTemplate)).order(0);
+        registry.addInterceptor(new RefreshTokenInterceptor(stringRedisTemplate)).order(0);//刷新
 
         registry.addInterceptor(new LoginInterceptor()).
                 excludePathPatterns("/user/login",
@@ -22,6 +22,9 @@ public class MvcConfig implements WebMvcConfigurer {
                                     "/shop/**",
                                     "/shop-type/**",
                                     "/upload/**",
+                                    "/ai/**",
                                     "/voucher/**").order(1);
+//         excludePathPatterns("/**")  // 排除所有路径
+//                .order(1);
     }
 }

@@ -11,6 +11,11 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+//第一个拦截器，拦截所有请求
+//检查是否携带token进来并根据token检查redis中有没有这个token对应的用户信息
+//没token或者没有信息（token过期）就交给登录拦截器，判断这个请求需不需要登录，需要的话登录拦截器就会要求用户登录
+//如果没有过期，就把用户信息存到这个请求对应的这个线程的threadlocal上，最后进行token的刷新，放行
+//线程结束的时候通过aftercomptetion释放掉threadloacl避免内存泄漏
 public class RefreshTokenInterceptor implements HandlerInterceptor {
     //这里并不是自动装配，因为RefreshTokenInterceptor是我们手动在WebConfig里new出来的
     private StringRedisTemplate stringRedisTemplate;

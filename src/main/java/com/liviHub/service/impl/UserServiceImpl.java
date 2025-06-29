@@ -44,9 +44,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     private StringRedisTemplate stringRedisTemplate;
     @Autowired
     private MailUtils mailUtils;
-    //发短信
+    //发短信（邮件）
     @Override
-    public Result sendCode(String phone, HttpSession session) throws jakarta.mail.MessagingException {
+    public Result sendCode(String phone, HttpSession session){
         // 1. 判断是否在一级限制条件内
         Boolean oneLevelLimit = stringRedisTemplate.opsForSet().isMember(ONE_LEVERLIMIT_KEY + phone, "1");
         if (oneLevelLimit != null && oneLevelLimit) {
@@ -54,14 +54,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             return Result.fail("您需要等5分钟后再请求");
         }
 
-// 2. 判断是否在二级限制条件内
+        // 2. 判断是否在二级限制条件内
         Boolean twoLevelLimit = stringRedisTemplate.opsForSet().isMember(TWO_LEVERLIMIT_KEY + phone, "1");
         if (twoLevelLimit != null && twoLevelLimit) {
             // 在二级限制条件内，不能发送验证码
             return Result.fail("您需要等20分钟后再请求");
         }
 
-// 3. 检查过去1分钟内发送验证码的次数
+        // 3. 检查过去1分钟内发送验证码的次数
         long oneMinuteAgo = System.currentTimeMillis() - 60 * 1000;
         long count_oneminute = stringRedisTemplate.opsForZSet().count(SENDCODE_SENDTIME_KEY + phone, oneMinuteAgo, System.currentTimeMillis());
         if (count_oneminute >= 1) {
@@ -84,14 +84,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             return Result.fail("5分钟内已经发送了5次，接下来如需再发送请等待5分钟后重试");
         }
 
-          //生成验证码
+        // 5. 生成验证码
         String code = mailUtils.generateVerificationCode();
 
          //将生成的验证码保持到redis
         stringRedisTemplate.opsForValue().set(LOGIN_CODE_KEY+phone,code,LOGIN_CODE_TTL, TimeUnit.MINUTES);
 
         log.info("发送登录验证码：{}", code);
-         //发送验证码
+         //6.发送验证码
         mailUtils.sendVerificationCode(phone, code);
 
         // 更新发送时间和次数
@@ -105,37 +105,31 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     public Result login(LoginFormDTO loginForm, HttpSession session) {
         String phone = loginForm.getPhone();
         String code = loginForm.getCode();
-        //检验手机号是否正确，不同的请求就应该再次去进行确认
-        if(RegexUtils.isEmailInvalid(phone))
-        {
-            //如果无效，则直接返回
-            return Result.fail("邮箱格式不正确！！");
-        }
-        //从redis中读取验证码，并进行校验
-        String Cachecode = stringRedisTemplate.opsForValue().get(LOGIN_CODE_KEY+phone);
-        //1. 校验邮箱
+        //1. 校验手机（当前为邮箱）格式
         if (RegexUtils.isEmailInvalid(phone)) {
             return Result.fail("邮箱格式不正确！！");
         }
-        //2. 不符合格式则报错
+        //2. 校验验证码
+        //从redis中读取验证码，并进行校验
+        String Cachecode = stringRedisTemplate.opsForValue().get(LOGIN_CODE_KEY+phone);
         if (Cachecode==null || !code.equals(Cachecode))
         {
             return Result.fail("无效的验证码");
         }
-        //如果上述都没有问题的话，就从数据库中查询该用户的信息
+        //3.检验通过，从数据库中查询该用户的信息
 
         //select * from tb_user where phone = ?
         User user = query().eq("phone", phone).one();
 
-        //判断用户是否存在
+        //4.判断用户是否存在（不存在则注册）
         if (user==null)
         {
             user = createuser(phone);
         }
-        //保存用户信息到Redis中
+        //5.为用户本次登录生成token（sessionID）
         String token = UUID.randomUUID().toString();
 
-        //7.2 将UserDto对象转为HashMap存储
+        //6.将从数据库获取到的user类属性复制到UserDto对象，然后转为HashMap（存储id，昵称，头像）
         UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
         HashMap<String, String > userMap = new HashMap<>();
         userMap.put("id", String.valueOf(userDTO.getId()));
@@ -143,14 +137,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         userMap.put("icon", userDTO.getIcon());
 
 
-        //7.3 存储
+        //7.使用token拼接前缀作为key ，用户信息作为value，存入redis的hash结构
         String tokenKey = LOGIN_USER_KEY + token;
         stringRedisTemplate.opsForHash().putAll(tokenKey, userMap);
 
-        //7.4 设置token有效期为30分钟
+        //7.1 设置token有效期：30分钟
         stringRedisTemplate.expire(tokenKey, LOGIN_USER_TTL, TimeUnit.MINUTES);
 
-        //7.5 登陆成功则删除验证码信息
+        //7.2 登陆成功，删除验证码信息
         stringRedisTemplate.delete(LOGIN_CODE_KEY + phone);
 
         //8. 返回token
@@ -158,7 +152,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     }
 
     private User createuser(String phone) {
-        //创建用户
+        //创建用户，生成随机昵称，保存到数据库（相当于注册了）
         User user = new User();
         user.setPhone(phone);
         user.setNickName(SystemConstants.USER_NICK_NAME_PREFIX +RandomUtil.randomString(10));
