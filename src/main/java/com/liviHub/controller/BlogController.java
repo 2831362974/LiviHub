@@ -6,11 +6,9 @@ import com.liviHub.model.dto.Result;
 import com.liviHub.model.dto.UserDTO;
 import com.liviHub.model.entity.Blog;
 import com.liviHub.service.IBlogService;
-import com.liviHub.service.IFollowService;
 import com.liviHub.utils.SystemConstants;
 import com.liviHub.utils.UserHolder;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -67,11 +65,6 @@ public class BlogController {
         // 获取当前页数据
         List<Blog> records = page.getRecords();
         return Result.ok(records);
-    }
-
-    @GetMapping("/of/follow")
-    public Result queryBlogOfFollow(@RequestParam("lastId") Long max, @RequestParam(value = "offset",defaultValue = "0") Integer offset) {
-        return blogService.queryBlogOfFollow(max,offset);
     }
 
 
